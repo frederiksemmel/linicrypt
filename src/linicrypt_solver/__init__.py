@@ -104,7 +104,7 @@ class PGVComporessionFunction:
             [
                 [("-", None), ("B", 13), ("B", 25), ("-", None)],
                 [("D", 1), ("-", None), ("D", 26), ("-", None)],
-                [("B", 2), ("B", 14), ("FP", 27), ("F", 1)],
+                [("B", 2), ("B", 14), ("F", 27), ("F", 1)],
                 [("-", None), ("-", None), ("D", 28), ("-", None)],
             ],
             [
@@ -122,14 +122,16 @@ class PGVComporessionFunction:
             [
                 [("P", 9), ("FP", 21), ("FP", 37), ("P", 46)],
                 [("✓", 10), ("D", 22), ("✓", 38), ("D", 47)],
-                [("B", 11), ("B", 23), ("FP", 39), ("F", 48)],
+                [("B", 11), ("B", 23), ("F", 39), ("F", 48)],
                 [("P", 12), ("D", 24), ("F", 40), ("D", 49)],
             ],
         ]
 
+        print(i_ff, i_k, i_p)
         pgv_category, _ = submatrices[i_ff][i_k][i_p]
         pgv_index = 16 * i_p + 4 * i_ff + i_k + 1
         assert pgv_index <= 64
+        assert pgv_index > 0
         return pgv_category, pgv_index
 
     def brs_category(self):
@@ -195,6 +197,25 @@ class MerkleDamgard:
         ]
         return eqs
 
+    def cycle_eqs(self, B: Matrix):
+        x1, k1, y1 = self.c(1)
+        xn, kn, yn = self.c(self.n)
+        eqs = [
+            Eq(xn * B, x1),
+            Eq(kn * B, k1),
+            Eq(yn * B, y1),
+        ]
+        for i in range(1, self.n):
+            xi, ki, yi = self.c(i)
+            xi_1, ki_1, yi_1 = self.c(i+1)
+            eqs += [
+                Eq(xi * B, xi_1),
+                Eq(ki * B, ki_1),
+                Eq(yi * B, yi_1),
+            ]
+            
+        return eqs
+
     # This doesnt make sense yet, but there has to be something there...
     # def flip_permute(self, i: int, j: int, B: Matrix):
     #     xi, ki, yi = self.c(i)
@@ -239,6 +260,32 @@ def H2_permute_constraints():
             pass
     print(count)
 
+def Hn_cycle_constraints(n=3):
+    # Iterate over all combinations of a, b, c, d, e, f in {0,1}
+    print("Permutation attack c1 -> c2 -> ... -> cn -> c1:")
+    print("-----------------------------")
+    count = 0
+    for a, b, c, d, e, f in product([0, 1], repeat=6):
+        f_compression = PGVComporessionFunction(a, b, c, d, e, f)
+        H_f = MerkleDamgard(f_compression, n)
+
+        B = Matrix(H_f.dimension, H_f.dimension, symbols(f"B0:{H_f.dimension ** 2}"))
+        permute_eqs = H_f.cycle_eqs(B)
+        out_inv = H_f.ouptut_invariant(B)
+        equations = permute_eqs + [out_inv]
+        solution = solve(equations, B)
+
+        if solution:
+            B_substituted = B.subs(solution)
+            if B_substituted != eye(5):
+                count += 1
+                print(f_compression)
+                pprint(B_substituted)
+                print()
+        else:
+            pass
+    print(count)
+
 # This doesnt make sense yet, but there has to be something there...
 # def H2_flip_permute_constraints():
 #     # Iterate over all combinations of a, b, c, d, e, f in {0,1}
@@ -261,7 +308,8 @@ def H2_permute_constraints():
 #             pass
 
 if __name__ == "__main__":
-    H2_permute_constraints()
+    # H2_permute_constraints()
+    Hn_cycle_constraints(n=4)
     # H2_flip_permute_constraints()
 
 
