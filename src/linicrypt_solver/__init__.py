@@ -1,8 +1,9 @@
 from itertools import product
 from dataclasses import dataclass
+from typing import is_typeddict
 
 # from sympy import BooleanTrue
-from sympy import symbols, Matrix, Eq, solve, init_printing, Identity, pprint
+from sympy import symbols, Matrix, Eq, solve, init_printing, Identity, pprint, eye
 
 init_printing(use_unicode=True)
 
@@ -216,6 +217,7 @@ def H2_permute_constraints():
     # Iterate over all combinations of a, b, c, d, e, f in {0,1}
     print("Permutation attack c1 <-> c2:")
     print("-----------------------------")
+    count = 0
     for a, b, c, d, e, f in product([0, 1], repeat=6):
         f_compression = PGVComporessionFunction(a, b, c, d, e, f)
         H_f = MerkleDamgard(f_compression, 2)
@@ -227,12 +229,15 @@ def H2_permute_constraints():
         solution = solve(equations, B)
 
         if solution:
-            print(f_compression)
             B_substituted = B.subs(solution)
-            pprint(B_substituted)
-            print()
+            if B_substituted != eye(5):
+                count += 1
+                print(f_compression)
+                pprint(B_substituted)
+                print()
         else:
             pass
+    print(count)
 
 # This doesnt make sense yet, but there has to be something there...
 # def H2_flip_permute_constraints():
