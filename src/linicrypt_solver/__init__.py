@@ -1,6 +1,5 @@
 from itertools import product
 from dataclasses import dataclass
-from typing import is_typeddict
 
 # from sympy import BooleanTrue
 from sympy import symbols, Matrix, Eq, solve, init_printing, Identity, pprint, eye
@@ -20,7 +19,7 @@ class PGVComporessionFunction:
 
     def __str__(self):
         a, b, c, d, e, f = self.a, self.b, self.c, self.d, self.e, self.f
-        return f"f({c}h + {d}m, {e}h + {f}m) + {a}h + {b}m\t PGV: {self.pgv_category()}, BRS: {self.brs_category()}"
+        return f"E({c}h + {d}m, {e}h + {f}m) + {a}h + {b}m\t PGV: {self.pgv_category()}, BRS: {self.brs_category()}"
 
     def to_canonical(self):
         self.B = Identity(3)
@@ -127,7 +126,7 @@ class PGVComporessionFunction:
             ],
         ]
 
-        print(i_ff, i_k, i_p)
+        # print(i_ff, i_k, i_p)
         pgv_category, _ = submatrices[i_ff][i_k][i_p]
         pgv_index = 16 * i_p + 4 * i_ff + i_k + 1
         assert pgv_index <= 64
@@ -170,8 +169,8 @@ class MerkleDamgard:
     @property
     def O(self):  # noqa: E743
         o1 = row_with_one(self.dimension, 0)
-        o2 = row_with_one(self.dimension, self.dimension - 1)
-        return Matrix([o1, o2])
+        on = row_with_one(self.dimension, self.dimension - 1)
+        return Matrix([o1, on])
 
     def c(self, i: int):  # noqa: E743
         assert i <= self.n
@@ -197,6 +196,19 @@ class MerkleDamgard:
         ]
         return eqs
 
+    def collapse_eqs(self, i: int, j: int, B: Matrix):
+        xi, ki, yi = self.c(i)
+        xj, kj, yj = self.c(j)
+        eqs = [
+            Eq(xi * B, xi),
+            Eq(xj * B, xi),
+            Eq(ki * B, ki),
+            Eq(kj * B, ki),
+            Eq(yi * B, yi),
+            Eq(yj * B, yi),
+        ]
+        return eqs
+
     def cycle_eqs(self, B: Matrix):
         x1, k1, y1 = self.c(1)
         xn, kn, yn = self.c(self.n)
@@ -207,13 +219,13 @@ class MerkleDamgard:
         ]
         for i in range(1, self.n):
             xi, ki, yi = self.c(i)
-            xi_1, ki_1, yi_1 = self.c(i+1)
+            xi_1, ki_1, yi_1 = self.c(i + 1)
             eqs += [
                 Eq(xi * B, xi_1),
                 Eq(ki * B, ki_1),
                 Eq(yi * B, yi_1),
             ]
-            
+
         return eqs
 
     # This doesnt make sense yet, but there has to be something there...
@@ -230,8 +242,17 @@ class MerkleDamgard:
     #     ]
     #     return eqs
 
-    def ouptut_invariant(self, B: Matrix):
+    def output_invariant(self, B: Matrix):
         return Eq(self.O @ B, self.O)
+
+    def output_h0(self, B: Matrix):
+        o1 = row_with_one(self.dimension, 0)
+        on = row_with_one(self.dimension, self.dimension - 1)
+        return Eq(on @ B, o1)
+
+    def iv_invariant(self, B: Matrix):
+        o1 = row_with_one(self.dimension, 0)
+        return Eq(o1 @ B, o1)
 
 
 def H2_permute_constraints():
@@ -245,7 +266,7 @@ def H2_permute_constraints():
 
         B = Matrix(H_f.dimension, H_f.dimension, symbols(f"B0:{H_f.dimension ** 2}"))
         permute_eqs = H_f.permute_eqs(1, 2, B)
-        out_inv = H_f.ouptut_invariant(B)
+        out_inv = H_f.output_invariant(B)
         equations = permute_eqs + [out_inv]
         solution = solve(equations, B)
 
@@ -260,31 +281,75 @@ def H2_permute_constraints():
             pass
     print(count)
 
-def Hn_cycle_constraints(n=3):
+
+def H2_collapse_constraints(force_collision=True):
+    # Iterate over all combinations of a, b, c, d, e, f in {0,1}
+    print("Collapse attack c1 <-| c2:")
+    print("--------------------------")
+    count = 0
+    for a, b, c, d, e, f in product([0, 1], repeat=6):
+        f_compression = PGVComporessionFunction(a, b, c, d, e, f)
+        H_f = MerkleDamgard(f_compression, 2)
+
+        B = Matrix(H_f.dimension, H_f.dimension, symbols(f"B0:{H_f.dimension ** 2}"))
+        equations = H_f.collapse_eqs(1, 2, B)
+        if force_collision:
+            equations += [H_f.output_h0(B)]
+        solution = solve(equations, B)
+
+        if solution:
+            B_substituted = B.subs(solution)
+            if B_substituted != eye(5):
+                count += 1
+                print(f_compression)
+                pprint(B_substituted)
+                if (
+                    f_compression.brs_category() == "g"
+                    and f_compression.pgv_category()[0] == "B"
+                ):
+                    pprint(B_substituted.eigenvects())
+                print()
+        else:
+            pass
+    print(count)
+
+
+def Hn_cycle_constraints(n=3, force_collision=True):
     # Iterate over all combinations of a, b, c, d, e, f in {0,1}
     print("Permutation attack c1 -> c2 -> ... -> cn -> c1:")
-    print("-----------------------------")
+    print("-----------------------------------------------")
     count = 0
     for a, b, c, d, e, f in product([0, 1], repeat=6):
         f_compression = PGVComporessionFunction(a, b, c, d, e, f)
         H_f = MerkleDamgard(f_compression, n)
 
         B = Matrix(H_f.dimension, H_f.dimension, symbols(f"B0:{H_f.dimension ** 2}"))
-        permute_eqs = H_f.cycle_eqs(B)
-        out_inv = H_f.ouptut_invariant(B)
-        equations = permute_eqs + [out_inv]
+        equations = H_f.cycle_eqs(B)
+        if force_collision:
+            out_inv = H_f.output_invariant(B)
+            equations += [out_inv]
+        else:
+            iv_inv = H_f.iv_invariant(B)
+            equations += [iv_inv]
         solution = solve(equations, B)
 
         if solution:
             B_substituted = B.subs(solution)
-            if B_substituted != eye(5):
+            if B_substituted != eye(H_f.dimension):
                 count += 1
                 print(f_compression)
                 pprint(B_substituted)
+                if (
+                    f_compression.brs_category() == "g"
+                    and f_compression.pgv_category()[0] == "B"
+                ):
+                    pprint(B_substituted.eigenvects())
+                    pprint(B_substituted.transpose().eigenvects())
                 print()
         else:
             pass
     print(count)
+
 
 # This doesnt make sense yet, but there has to be something there...
 # def H2_flip_permute_constraints():
@@ -309,7 +374,6 @@ def Hn_cycle_constraints(n=3):
 
 if __name__ == "__main__":
     # H2_permute_constraints()
-    Hn_cycle_constraints(n=4)
+    Hn_cycle_constraints(n=4, force_collision=False)
+    # H2_collapse_constraints(force_collision=True)
     # H2_flip_permute_constraints()
-
-

@@ -6,6 +6,7 @@
 #   features: []
 #   all-features: false
 #   with-sources: false
+#   generate-hashes: false
 
 -e file:.
 asttokens==2.4.1
@@ -14,13 +15,26 @@ decorator==5.1.1
     # via ipython
 executing==2.0.1
     # via stack-data
+galois==0.4.1
+    # via linicrypt-solver
 ipython==8.23.0
 jedi==0.19.1
     # via ipython
+llvmlite==0.43.0
+    # via numba
+loguru==0.7.2
+    # via linicrypt-solver
 matplotlib-inline==0.1.6
     # via ipython
+more-itertools==10.4.0
+    # via linicrypt-solver
 mpmath==1.3.0
     # via sympy
+numba==0.60.0
+    # via galois
+numpy==2.0.1
+    # via galois
+    # via numba
 parso==0.8.4
     # via jedi
 pexpect==4.9.0
@@ -42,5 +56,7 @@ sympy==1.10
 traitlets==5.14.2
     # via ipython
     # via matplotlib-inline
+typing-extensions==4.12.2
+    # via galois
 wcwidth==0.2.13
     # via prompt-toolkit
