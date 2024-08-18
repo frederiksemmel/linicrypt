@@ -15,8 +15,8 @@ logger.add(
     format="{time:YYYY-MM-DD HH:mm:ss} | {level}\n{message}",  # Add newline before {message}
 )
 
-prime = 29
-GF = galois.GF(prime)
+field_size = 2**4
+GF = galois.GF(field_size)
 
 
 def stack_matrices(A: FieldArray, B: FieldArray, axis=0) -> FieldArray:
@@ -191,30 +191,44 @@ class Constraints:
         return Constraints(cs_1 + cs_2)
 
 
-C = Constraints.from_repr(
-    [
-        ([1, 0, 0, 0, 0], [0, 0, 1, 0, 0]),
-        ([0, 0, 1, 0, 0], [0, 0, 0, 1, 0]),
-        ([0, 1, 0, 0, 0], [0, 0, 0, 0, 1]),
-    ]
-)
-output = GF([[0, 0, 0, 1, 1]])
-S = GF(
-    [
-        [1, 0, 0, 0, 0],
-        [0, 1, 0, 0, 0],
-        [0, 0, 1, 0, 0],
-        [0, 0, 0, 1, 0],
-        [0, 0, 0, 0, 1],
-        [1, 0, 0, 0, 0],
-        [0, 1, 0, 0, 0],
-        [0, 0, 1, 0, 0],
-        [0, 0, 0, 1, 0],
-        [0, 0, 0, 0, 1],
-    ]
-)
-C_join = C.construct_joined()
-output_collapse = embed_left(output) - embed_right(output)
-f = output_collapse.null_space().transpose()
-C_joined_f = C_join.map(f)
-# subspaces = C_joined_f.find_solvable_subspaces()
+if __name__ == "__main__":
+    C = Constraints.from_repr(
+        [
+            ([1, 0, 0, 0, 0], [0, 0, 1, 0, 0]),
+            ([0, 0, 1, 0, 0], [0, 0, 0, 1, 0]),
+            ([0, 1, 0, 0, 0], [0, 0, 0, 0, 1]),
+        ]
+    )
+    output = GF([[1, 1, 1, 1, 1]])
+    S = GF(
+        [
+            [1, 0, 0, 0, 0],
+            [0, 1, 0, 0, 0],
+            [0, 0, 1, 0, 0],
+            [0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0],
+            [0, 1, 0, 0, 0],
+            [0, 0, 1, 0, 0],
+            [0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 1],
+        ]
+    )
+    C_join = C.construct_joined()
+    output_collapse = embed_left(output) - embed_right(output)
+    f = output_collapse.null_space().transpose()
+
+    # Robust way to compute the preimage of S
+    # Annihlator of S called S^0 are the dual vectors that are zero on S
+    S_0 = S.left_null_space()
+    # This is f^*(S^0)
+    f_pullback_S_0 = S_0 @ f
+    # We have f^-1(S) = f^*(S^0))^0. Because S is in the image of f, this f(f^-1(S)) = S
+    preimage_S = f_pullback_S_0.null_space().transpose()
+    assert (f @ preimage_S == S).all()
+
+    C_joined_f = C_join.map(f)
+    subspaces = C_joined_f.find_solvable_subspaces_outside(preimage_S)
+    for part, subspace in subspaces:
+        print(part)
+        print(subspace)
