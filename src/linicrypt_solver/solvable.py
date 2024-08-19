@@ -1,7 +1,7 @@
 import sys
 from itertools import pairwise, permutations
 
-import galois
+from linicrypt_solver.field import GF
 import numpy as np
 from galois import FieldArray
 from loguru import logger
@@ -14,9 +14,6 @@ logger.add(
     level="INFO",
     format="{time:YYYY-MM-DD HH:mm:ss} | {level}\n{message}",  # Add newline before {message}
 )
-
-field_size = 2**4
-GF = galois.GF(field_size)
 
 
 def stack_matrices(A: FieldArray, B: FieldArray, axis=0) -> FieldArray:
@@ -199,7 +196,7 @@ if __name__ == "__main__":
             ([0, 1, 0, 0, 0], [0, 0, 0, 0, 1]),
         ]
     )
-    output = GF([[1, 1, 1, 1, 1]])
+    output = GF([[0, 0, 0, 2, 2]])
     S = GF(
         [
             [1, 0, 0, 0, 0],
