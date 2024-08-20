@@ -1,73 +1,14 @@
-import sys
 from itertools import pairwise, permutations
 
 from linicrypt_solver.field import GF
-import numpy as np
 from galois import FieldArray
 from loguru import logger
 from more_itertools import set_partitions
 
-# Configure logger to print the log message on a new line
-logger.remove()  # Remove the default handler
-logger.add(
-    sink=sys.stderr,
-    level="INFO",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level}\n{message}",  # Add newline before {message}
-)
-
-
-def stack_matrices(A: FieldArray, B: FieldArray, axis=0) -> FieldArray:
-    return GF(np.concatenate((A, B), axis=axis))
-
-
-def embed_left(A: FieldArray) -> FieldArray:
-    zeros = GF.Zeros(A.shape)
-    return GF(np.concatenate((A, zeros), axis=1))
-
-
-def embed_right(A: FieldArray) -> FieldArray:
-    zeros = GF.Zeros(A.shape)
-    return GF(np.concatenate((zeros, A), axis=1))
-
-
-class Constraint:
-    def __init__(self, q: np.ndarray, a: np.ndarray):
-        m, n = a.shape
-        assert m == 1
-        assert n == q.shape[1]
-
-        self.q = GF(q)
-        self.a = GF(a)
-
-    def difference_matrix(self, other: "Constraint") -> FieldArray:
-        q_row = self.q - other.q
-        a_row = self.a - other.a
-        return stack_matrices(q_row, a_row)
-
-    def map(self, f: FieldArray) -> "Constraint":
-        q = self.q @ f
-        a = self.a @ f
-        return Constraint(q, a)
-
-    def dim(self):
-        assert self.q.shape[1] == self.a.shape[1]
-        return self.a.shape[1]
-
-    def __repr__(self):
-        return f"{self.q[0]} |-> {self.a[0]}"
-
-    def __eq__(self, other) -> bool:
-        return (self.q == other.q).all() and (self.a == other.a).all()
-
-    def embed_left(self) -> "Constraint":
-        q = embed_left(self.q)
-        a = embed_left(self.a)
-        return Constraint(q, a)
-
-    def embed_right(self) -> "Constraint":
-        q = embed_right(self.q)
-        a = embed_right(self.a)
-        return Constraint(q, a)
+from linicrypt_solver import Constraint, DualVector
+from linicrypt_solver.ideal_cipher import ConstraintE
+from linicrypt_solver.random_oracle import ConstraintH
+from linicrypt_solver.utils import stack_matrices
 
 
 class Constraints:
@@ -78,36 +19,49 @@ class Constraints:
                 ordered_set.append(c)
         self.cs: list[Constraint] = ordered_set
 
+    def add(self, c: Constraint):
+        if len(self.cs) > 0:
+            assert c.dim() == self.cs[0].dim()
+        self.cs.append(c)
+
     @staticmethod
-    def from_repr(representation: list[tuple[list[int], list[int]]]) -> "Constraints":
+    def from_repr(representation: list[tuple[DualVector, ...]]) -> "Constraints":
         cs = []
-        for q, a in representation:
-            c = Constraint(np.array([q]), np.array([a]))
+        for c_repr in representation:
+            if len(c_repr) == 2:
+                q, a = c_repr
+                c = ConstraintH(q, a)
+            elif len(c_repr) == 3:
+                x, k, y = c_repr
+                c = ConstraintE(x, k, y)
+            else:
+                raise ValueError(f"Unknown constraint representation {c_repr}")
             cs.append(c)
         return Constraints(cs)
+
+    def is_proper(self) -> bool:
+        # check if some queries are exactly the same.
+        # Then they should have the same answer vector (and the constraints should have
+        # collapsed during construction, or in math term, thanks to describing constraints as a set)
+        for i, c in enumerate(self.cs):
+            if not c.is_proper(self.cs[:i]):
+                logger.debug(
+                    f"Not solution ordering because {c} is not proper with {self.cs[:i]}"
+                )
+                return False
+        return True
 
     def is_solution_ordering(self) -> bool:
         if len(self.cs) == 0:
             return True
-        fixing_space = self.cs[0].q
-        qs = []
-        logger.debug(f"Checking solution ordering of {self.cs}")
+        dim = self.dim()
+        fixing = GF.Zeros((1, dim))
         for i, c in enumerate(self.cs):
-            fixing_space = stack_matrices(fixing_space, c.q).row_space()
-            new_fixing_space = stack_matrices(fixing_space, c.a).row_space()
-            assert len(fixing_space) <= len(new_fixing_space)
-            if len(fixing_space.row_space()) == len(new_fixing_space.row_space()):
-                logger.debug(f"Not solution ordering because of {i}: {c.a}")
+            new_fixing = c.is_solvable(fixing)
+            if new_fixing is None:
+                logger.debug(f"Not solution ordering because of {i}: {c}")
                 return False
-            if any((c.q == q).all() for q in qs):
-                logger.debug(
-                    f"Not solution ordering because {c.q} repeated with {c.a} different"
-                )
-                return False
-            qs.append(c.q)
-            fixing_space = new_fixing_space
-
-        logger.info(f"{self.cs} is solution ordering")
+            fixing = new_fixing
         return True
 
     def is_solvable(self) -> bool:
@@ -115,7 +69,6 @@ class Constraints:
             C_permuted = Constraints(list(permuted_cs))
             if C_permuted.is_solution_ordering():
                 return True
-
         return False
 
     def find_solvable_subspaces(self) -> list[tuple[tuple[int, ...], FieldArray]]:
@@ -150,6 +103,7 @@ class Constraints:
         assert i != j
         assert i < len(self.cs)
         assert j < len(self.cs)
+        assert type(self.cs[i]) is type(self.cs[j])
 
         diff = self.cs[i].difference_matrix(self.cs[j])
         f_matrix = diff.null_space().transpose()
@@ -181,51 +135,19 @@ class Constraints:
             lines.append((f"{c}"))
         return "\n".join(lines)
 
+    def dim(self) -> int:
+        if len(self.cs) == 0:
+            return 0
+        dim = self.cs[0].dim()
+        assert all(dim == c.dim() for c in self.cs)
+        return dim
+
     def construct_joined(self):
-        cs_1 = [c.embed_left() for c in self.cs]
-        cs_2 = [c.embed_right() for c in self.cs]
+        dim = self.dim()
+        cs_1 = [c.embed_left(dim * 2) for c in self.cs]
+        cs_2 = [c.embed_right(dim * 2) for c in self.cs]
 
         return Constraints(cs_1 + cs_2)
 
-
-if __name__ == "__main__":
-    C = Constraints.from_repr(
-        [
-            ([1, 0, 0, 0, 0], [0, 0, 1, 0, 0]),
-            ([0, 0, 1, 0, 0], [0, 0, 0, 1, 0]),
-            ([0, 1, 0, 0, 0], [0, 0, 0, 0, 1]),
-        ]
-    )
-    output = GF([[0, 0, 0, 2, 2]])
-    S = GF(
-        [
-            [1, 0, 0, 0, 0],
-            [0, 1, 0, 0, 0],
-            [0, 0, 1, 0, 0],
-            [0, 0, 0, 1, 0],
-            [0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0],
-            [0, 1, 0, 0, 0],
-            [0, 0, 1, 0, 0],
-            [0, 0, 0, 1, 0],
-            [0, 0, 0, 0, 1],
-        ]
-    )
-    C_join = C.construct_joined()
-    output_collapse = embed_left(output) - embed_right(output)
-    f = output_collapse.null_space().transpose()
-
-    # Robust way to compute the preimage of S
-    # Annihlator of S called S^0 are the dual vectors that are zero on S
-    S_0 = S.left_null_space()
-    # This is f^*(S^0)
-    f_pullback_S_0 = S_0 @ f
-    # We have f^-1(S) = f^*(S^0))^0. Because S is in the image of f, this f(f^-1(S)) = S
-    preimage_S = f_pullback_S_0.null_space().transpose()
-    assert (f @ preimage_S == S).all()
-
-    C_joined_f = C_join.map(f)
-    subspaces = C_joined_f.find_solvable_subspaces_outside(preimage_S)
-    for part, subspace in subspaces:
-        print(part)
-        print(subspace)
+    def embed_left(self, dim: int):
+        return Constraints([c.embed_left(dim) for c in self.cs])

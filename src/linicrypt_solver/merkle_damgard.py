@@ -1,5 +1,10 @@
 from dataclasses import dataclass
+
+from loguru import logger
+
 from linicrypt_solver.field import GF
+from linicrypt_solver.ideal_cipher import ConstraintE
+from linicrypt_solver.solvable import Constraints
 
 
 @dataclass
@@ -17,10 +22,17 @@ class PGVComporessionFunction:
         self.params = params
         self.I = self.compute_I()
         self.O = self.compute_O()
-        self.C = self.compute_C()
+        self.C = self.construct_constraint()
 
     def __str__(self):
-        a, b, c, d, e, f = self.a, self.b, self.c, self.d, self.e, self.f
+        a, b, c, d, e, f = (
+            self.params.a,
+            self.params.b,
+            self.params.c,
+            self.params.d,
+            self.params.e,
+            self.params.f,
+        )
         return f"E({c}h + {d}m, {e}h + {f}m) + {a}h + {b}m\t PGV: {self.pgv_category()}, BRS: {self.brs_category()}"
 
     def compute_I(
@@ -40,11 +52,11 @@ class PGVComporessionFunction:
     def compute_y(self):  # noqa: E743
         return GF([[0, 0, 1]])
 
-    def constraint(self):
+    def construct_constraint(self):
         x = self.compute_x()
         k = self.compute_k()
         y = self.compute_y()
-        return (x, k, y)
+        return ConstraintE(x, k, y)
 
     def linicrypt_is_secure(self):
         a, b, c, d, e, f = (
@@ -62,7 +74,7 @@ class PGVComporessionFunction:
         )
 
     def pgv_choice_of_ff(self):
-        match (self.a, self.b):
+        match (self.params.a, self.params.b):
             case (0, 0):
                 return "V", 0
             case (0, 1):
@@ -74,7 +86,7 @@ class PGVComporessionFunction:
         raise ValueError
 
     def pgv_choice_of_k(self):
-        match (self.c, self.d):
+        match (self.params.c, self.params.d):
             case (0, 0):
                 return "V", 3
             case (0, 1):
@@ -86,7 +98,7 @@ class PGVComporessionFunction:
         raise ValueError
 
     def pgv_choice_of_p(self):
-        match (self.e, self.f):
+        match (self.params.e, self.params.f):
             case (0, 0):
                 return "V", 3
             case (0, 1):
@@ -143,116 +155,13 @@ class PGVComporessionFunction:
         _, pgv_index = self.pgv_category()
         return brs_categories[pgv_index - 1]
 
-
-def row_with_one(d: int, n: int) -> Matrix:
-    x = Matrix.zeros(1, d)
-    x[0, n] = 1
-    return x
-
-
-# Warning: This is in the nicer merkle damgard basis per default
-# TODO properly handle the basis changes as in the compression function
-class MerkleDamgard:
-    def __init__(self, f: PGVComporessionFunction, n: int):
-        f.to_output_1()
-        self.f = f
-        self.n = n
-        self.dimension = n * 2 + 1
-        self.B = Identity(n * 2 + 1)
-
-    @property
-    def I(self):  # noqa: E743
-        h0 = row_with_one(self.dimension, 0)
-        rows = [h0]
-        for i in range(1, self.dimension, 2):
-            mi = row_with_one(self.dimension, i)
-            rows.append(mi)
-        return Matrix(rows)
-
-    @property
-    def O(self):  # noqa: E743
-        o1 = row_with_one(self.dimension, 0)
-        on = row_with_one(self.dimension, self.dimension - 1)
-        return Matrix([o1, on])
-
-    def c(self, i: int):  # noqa: E743
-        assert i <= self.n
-        assert i > 0
-        k = Matrix.zeros(1, self.dimension)
-        k[0, (i - 1) * 2 : i * 2 + 1] = self.f.k
-        x = Matrix.zeros(1, self.dimension)
-        x[0, (i - 1) * 2 : i * 2 + 1] = self.f.x
-        y = Matrix.zeros(1, self.dimension)
-        y[0, (i - 1) * 2 : i * 2 + 1] = self.f.y
-        return (x, k, y)
-
-    def permute_eqs(self, i: int, j: int, B: Matrix):
-        xi, ki, yi = self.c(i)
-        xj, kj, yj = self.c(j)
-        eqs = [
-            Eq(xi * B, xj),
-            Eq(xj * B, xi),
-            Eq(ki * B, kj),
-            Eq(kj * B, ki),
-            Eq(yi * B, yj),
-            Eq(yj * B, yi),
-        ]
-        return eqs
-
-    def collapse_eqs(self, i: int, j: int, B: Matrix):
-        xi, ki, yi = self.c(i)
-        xj, kj, yj = self.c(j)
-        eqs = [
-            Eq(xi * B, xi),
-            Eq(xj * B, xi),
-            Eq(ki * B, ki),
-            Eq(kj * B, ki),
-            Eq(yi * B, yi),
-            Eq(yj * B, yi),
-        ]
-        return eqs
-
-    def cycle_eqs(self, B: Matrix):
-        x1, k1, y1 = self.c(1)
-        xn, kn, yn = self.c(self.n)
-        eqs = [
-            Eq(xn * B, x1),
-            Eq(kn * B, k1),
-            Eq(yn * B, y1),
-        ]
-        for i in range(1, self.n):
-            xi, ki, yi = self.c(i)
-            xi_1, ki_1, yi_1 = self.c(i + 1)
-            eqs += [
-                Eq(xi * B, xi_1),
-                Eq(ki * B, ki_1),
-                Eq(yi * B, yi_1),
-            ]
-
-        return eqs
-
-    # This doesnt make sense yet, but there has to be something there...
-    # def flip_permute(self, i: int, j: int, B: Matrix):
-    #     xi, ki, yi = self.c(i)
-    #     xj, kj, yj = self.c(j)
-    #     eqs = [
-    #         Eq(xi * B, xj),
-    #         Eq(xj * B, xi),
-    #         Eq(ki * B, kj),
-    #         Eq(kj * B, ki),
-    #         Eq(yi * B, yj),
-    #         Eq(yj * B, yi),
-    #     ]
-    #     return eqs
-
-    def output_invariant(self, B: Matrix):
-        return Eq(self.O @ B, self.O)
-
-    def output_h0(self, B: Matrix):
-        o1 = row_with_one(self.dimension, 0)
-        on = row_with_one(self.dimension, self.dimension - 1)
-        return Eq(on @ B, o1)
-
-    def iv_invariant(self, B: Matrix):
-        o1 = row_with_one(self.dimension, 0)
-        return Eq(o1 @ B, o1)
+    def construct_MD(self, n: int):
+        constraints = Constraints([])
+        for i in range(1, n + 1):
+            dim = constraints.dim()
+            c = self.C.embed_right(dim + 3)
+            constraints = constraints.embed_left(dim + 3)
+            # TODO collapse the first input of this compression function with the output of the ent constraints
+            constraints.add(c)
+        logger.debug(f"constraints are {constraints}")
+        return constraints
