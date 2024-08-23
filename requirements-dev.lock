@@ -53,6 +53,8 @@ stack-data==0.6.3
     # via ipython
 sympy==1.10
     # via linicrypt-solver
+tqdm==4.66.5
+    # via linicrypt-solver
 traitlets==5.14.2
     # via ipython
     # via matplotlib-inline

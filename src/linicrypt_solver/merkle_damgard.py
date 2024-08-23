@@ -177,6 +177,8 @@ class PGVComporessionFunction:
             md_construction.merge(f_right)
             # we need to remove the first input from the inputs of H_n
             md_construction.fixing = GF(np.delete(md_construction.fixing, -2, 0))
+            # we just take the last output as the output of MD
+            md_construction.output = GF(md_construction.output[-1:])
             logger.debug(md_construction)
             md_construction = md_construction.map(collapse_f)
             logger.debug(f"Collapse with:\n{collapse_f}")

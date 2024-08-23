@@ -4,6 +4,7 @@ from linicrypt_solver.field import GF
 from galois import FieldArray
 from loguru import logger
 from more_itertools import set_partitions
+from tqdm import tqdm
 
 from linicrypt_solver import Constraint, DualVector
 from linicrypt_solver.ideal_cipher import ConstraintE
@@ -61,6 +62,8 @@ class Constraints:
         dim = self.dim()
         if fixing is None:
             fixing = GF.Zeros((1, dim))
+        else:
+            assert fixing.shape[1] == dim
         for i, c in enumerate(self.cs):
             new_fixing = c.is_solvable(fixing)
             if new_fixing is None:
@@ -83,11 +86,20 @@ class Constraints:
         n = len(self.cs)
 
         subspaces = []
+
+        # https://codegolf.stackexchange.com/questions/132379/output-the-n-th-bell-number
+        # https://en.wikipedia.org/wiki/Partition_of_a_set
+        def bell_number(n, k=0):
+            return n < 1 or k * bell_number(n - 1, k) + bell_number(n - 1, k + 1)
+
         # todo len
-        for partition in set_partitions(range(n)):
-            logger.debug(f"collapsing {partition}")
+        for partition in tqdm(set_partitions(range(n)), total=bell_number(n)):
+            logger.info(f"collapsing {partition}")
             collapsed_C, subspace = self.collapse(partition)
-            if collapsed_C.is_solvable(fixing):
+            collapsed_fixing = None
+            if fixing is not None:
+                collapsed_fixing = fixing @ subspace
+            if collapsed_C.is_solvable(collapsed_fixing):
                 subspaces.append((partition, subspace))
         return subspaces
 
@@ -132,6 +144,7 @@ class Constraints:
         logger.debug(f"diff matrix:\n{diff}")
 
         f_matrix = diff.null_space().transpose()
+        logger.debug(f"collapsing space:\n{f_matrix}")
         return (self.map(f_matrix), f_matrix)
 
     def map(self, f: FieldArray) -> "Constraints":
