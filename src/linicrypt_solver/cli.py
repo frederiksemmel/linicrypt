@@ -26,7 +26,7 @@ def test_cr():
         ]
     )
     fixing = GF([[1, 0, 0, 0, 0], [0, 1, 0, 0, 0]])
-    output = GF([[0, 0, 0, 2, 2]])
+    output = GF([[0, 0, 0, 1, 28]])
     program = AlgebraicRep(constraints, fixing, output)
     print(f"{program} is CR: {program.is_collision_resistant()}")
     print(f"{program} is 2PR: {program.is_second_preimage_resistant()}")
