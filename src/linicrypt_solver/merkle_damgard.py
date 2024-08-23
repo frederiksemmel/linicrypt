@@ -1,10 +1,13 @@
 from dataclasses import dataclass
 
+import numpy as np
 from loguru import logger
 
+from linicrypt_solver.algebraic_representation import AlgebraicRep
 from linicrypt_solver.field import GF
 from linicrypt_solver.ideal_cipher import ConstraintE
 from linicrypt_solver.solvable import Constraints
+from linicrypt_solver.utils import stack_matrices
 
 
 @dataclass
@@ -20,8 +23,8 @@ class PGVParams:
 class PGVComporessionFunction:
     def __init__(self, params: PGVParams):
         self.params = params
-        self.I = self.compute_I()
-        self.O = self.compute_O()
+        self.I = GF([[1, 0, 0], [0, 1, 0]])
+        self.O = GF([[self.params.a, self.params.b, 1]])
         self.C = self.construct_constraint()
 
     def __str__(self):
@@ -35,21 +38,13 @@ class PGVComporessionFunction:
         )
         return f"E({c}h + {d}m, {e}h + {f}m) + {a}h + {b}m\t PGV: {self.pgv_category()}, BRS: {self.brs_category()}"
 
-    def compute_I(
-        self,
-    ):  # noqa: E743
-        return GF([[1, 0, 0], [0, 1, 0]])
-
-    def compute_O(self):  # noqa: E743
-        return GF([[self.params.a, self.params.b, 1]])
-
-    def compute_x(self):  # noqa: E743
+    def compute_x(self):
         return GF([[self.params.c, self.params.d, 0]])
 
-    def compute_k(self):  # noqa: E743
+    def compute_k(self):
         return GF([[self.params.e, self.params.f, 0]])
 
-    def compute_y(self):  # noqa: E743
+    def compute_y(self):
         return GF([[0, 0, 1]])
 
     def construct_constraint(self):
@@ -57,6 +52,18 @@ class PGVComporessionFunction:
         k = self.compute_k()
         y = self.compute_y()
         return ConstraintE(x, k, y)
+
+    def algebraic_rep(self, basis: str):
+        if basis == "canonical":
+            return AlgebraicRep(Constraints([self.C]), self.I, self.O)
+        elif basis == "merkle-damgard":
+            B = GF(np.linalg.inv(stack_matrices(self.I, self.O)))
+            cs = Constraints([self.C]).map(B)
+            input = self.I @ B
+            output = self.O @ B
+            return AlgebraicRep(cs, input, output)
+        else:
+            raise ValueError(f"Unknown basis {basis}")
 
     def linicrypt_is_secure(self):
         a, b, c, d, e, f = (
@@ -155,13 +162,23 @@ class PGVComporessionFunction:
         _, pgv_index = self.pgv_category()
         return brs_categories[pgv_index - 1]
 
-    def construct_MD(self, n: int):
-        constraints = Constraints([])
-        for i in range(1, n + 1):
-            dim = constraints.dim()
-            c = self.C.embed_right(dim + 3)
-            constraints = constraints.embed_left(dim + 3)
-            # TODO collapse the first input of this compression function with the output of the ent constraints
-            constraints.add(c)
-        logger.debug(f"constraints are {constraints}")
-        return constraints
+    def construct_MD(self, n: int, basis: str = "merkle-damgard"):
+        md_construction = self.algebraic_rep(basis)
+        for _ in range(2, n + 1):
+            dim = md_construction.dim()
+            f_right = self.algebraic_rep(basis).embed_right(dim + 3)
+            md_construction = md_construction.embed_left(dim + 3)
+            # collapse the first input of this compression function
+            # with the output of the ent constraints
+            first_input = f_right.fixing[:1]
+            prev_output = md_construction.output[-1:]
+
+            collapse_f = GF(first_input - prev_output).null_space().transpose()
+            md_construction.merge(f_right)
+            # we need to remove the first input from the inputs of H_n
+            md_construction.fixing = GF(np.delete(md_construction.fixing, -2, 0))
+            logger.debug(md_construction)
+            md_construction = md_construction.map(collapse_f)
+            logger.debug(f"Collapse with:\n{collapse_f}")
+
+        return md_construction

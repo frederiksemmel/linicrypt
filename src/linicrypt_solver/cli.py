@@ -1,6 +1,7 @@
 import sys
 
 from loguru import logger
+from itertools import product
 
 from linicrypt_solver.field import GF
 from linicrypt_solver.merkle_damgard import PGVComporessionFunction, PGVParams
@@ -61,10 +62,16 @@ def test_cr():
 
 
 def test_MD():
-    params = PGVParams(1, 1, 0, 1, 1, 0)
-    pgv_f = PGVComporessionFunction(params)
-    n = 3
-    pgv_f.construct_MD(n)
+    for a, b, c, d, e, f in product([0, 1], repeat=6):
+        params = PGVParams(a, b, c, d, e, f)
+        pgv_f = PGVComporessionFunction(params)
+        print(pgv_f)
+        n = 2
+        H_n = pgv_f.construct_MD(n)
+        # print(H_n)
+        # print(H_n.cs.is_solvable(fixing=H_n.fixing))
+        # print(f"Collision resistant: {H_n.is_collision_resistant()}")
+        print(f"Collision resistant: {H_n.is_second_preimage_resistant()}")
 
 
 if __name__ == "__main__":

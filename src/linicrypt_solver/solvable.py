@@ -24,6 +24,10 @@ class Constraints:
             assert c.dim() == self.cs[0].dim()
         self.cs.append(c)
 
+    def merge(self, other: "Constraints"):
+        assert self.dim() == other.dim()
+        self.cs += other.cs
+
     @staticmethod
     def from_repr(representation: list[tuple[DualVector, ...]]) -> "Constraints":
         cs = []
@@ -51,11 +55,12 @@ class Constraints:
                 return False
         return True
 
-    def is_solution_ordering(self) -> bool:
+    def is_solution_ordering(self, fixing: FieldArray | None = None) -> bool:
         if len(self.cs) == 0:
             return True
         dim = self.dim()
-        fixing = GF.Zeros((1, dim))
+        if fixing is None:
+            fixing = GF.Zeros((1, dim))
         for i, c in enumerate(self.cs):
             new_fixing = c.is_solvable(fixing)
             if new_fixing is None:
@@ -64,27 +69,30 @@ class Constraints:
             fixing = new_fixing
         return True
 
-    def is_solvable(self) -> bool:
+    def is_solvable(self, fixing: FieldArray | None = None) -> bool:
         for permuted_cs in permutations(self.cs):
             C_permuted = Constraints(list(permuted_cs))
-            if C_permuted.is_solution_ordering():
+            if C_permuted.is_solution_ordering(fixing):
+                logger.info(f"Found solution ordering {permuted_cs}")
                 return True
         return False
 
-    def find_solvable_subspaces(self) -> list[tuple[tuple[int, ...], FieldArray]]:
+    def find_solvable_subspaces(
+        self, fixing: FieldArray | None = None
+    ) -> list[tuple[tuple[int, ...], FieldArray]]:
         n = len(self.cs)
 
         subspaces = []
         # todo len
         for partition in set_partitions(range(n)):
-            logger.info(f"collapsing {partition}")
+            logger.debug(f"collapsing {partition}")
             collapsed_C, subspace = self.collapse(partition)
-            if collapsed_C.is_solvable():
+            if collapsed_C.is_solvable(fixing):
                 subspaces.append((partition, subspace))
         return subspaces
 
     def find_solvable_subspaces_outside(
-        self, W: FieldArray
+        self, W: FieldArray, fixing: FieldArray | None = None
     ) -> list[tuple[tuple[int, ...], FieldArray]]:
         dim_W = len(W.column_space())
 
@@ -95,7 +103,7 @@ class Constraints:
 
         return [
             (part, subspace)
-            for part, subspace in self.find_solvable_subspaces()
+            for part, subspace in self.find_solvable_subspaces(fixing)
             if is_outside_W(subspace)
         ]
 
@@ -121,7 +129,7 @@ class Constraints:
                 logger.debug(f"in collapse collapsing {i},{j}")
                 diff = stack_matrices(diff, self.cs[i].difference_matrix(self.cs[j]))
 
-        logger.debug(f"diff {diff}")
+        logger.debug(f"diff matrix:\n{diff}")
 
         f_matrix = diff.null_space().transpose()
         return (self.map(f_matrix), f_matrix)
@@ -151,3 +159,6 @@ class Constraints:
 
     def embed_left(self, dim: int):
         return Constraints([c.embed_left(dim) for c in self.cs])
+
+    def embed_right(self, dim: int):
+        return Constraints([c.embed_right(dim) for c in self.cs])

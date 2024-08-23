@@ -1,11 +1,9 @@
 import sys
-from itertools import pairwise, permutations
 from typing import Self
 
 import numpy as np
 from galois import FieldArray
 from loguru import logger
-from more_itertools import set_partitions
 
 from linicrypt_solver.field import GF
 from linicrypt_solver.utils import stack_matrices
@@ -51,7 +49,9 @@ class ConstraintE(Constraint):
         new_fixing_space = stack_matrices(fixing, self.y).row_space()
         assert len(fixing) <= len(new_fixing_space)
         if len(fixing.row_space()) == len(new_fixing_space.row_space()):
-            logger.debug(f"y = {self.y} is contained in {fixing} + <x,y>")
+            logger.debug(
+                f"solvable_enc: y = {self.y} is contained in:\n{fixing} + <x,y>"
+            )
             return None
         return new_fixing_space
 
@@ -60,14 +60,16 @@ class ConstraintE(Constraint):
         new_fixing_space = stack_matrices(fixing, self.x).row_space()
         assert len(fixing) <= len(new_fixing_space)
         if len(fixing.row_space()) == len(new_fixing_space.row_space()):
-            logger.debug(f"y = {self.y} is contained in {fixing} + <x,y>")
+            logger.debug(
+                f"solvable_dec: y = {self.y} is contained in:\n{fixing} + <x,y>"
+            )
             return None
         return new_fixing_space
 
     def is_solvable(self, fixing: FieldArray) -> None | FieldArray:
         enc_space = self.is_solvable_enc(fixing)
         dec_space = self.is_solvable_dec(fixing)
-        if enc_space is None or dec_space is None:
+        if enc_space is None and dec_space is None:
             return None
         return enc_space
 
