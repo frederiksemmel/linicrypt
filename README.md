@@ -167,6 +167,8 @@ is 2PR: True
 
 ## Results from the sympy implementation for the first conjecture
 
+Note: This is relatively old, only for the first conjecture which still doesn't have a proof.
+
 This only finds basis change matrices, collapses are not implemented yet.
 
 ```
