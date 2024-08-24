@@ -74,7 +74,9 @@ class Constraints:
         return True
 
     def is_solvable_brute_force(self, fixing: FieldArray) -> bool:
+        logger.debug(f"Checking solvability of:\n{self} fixing:\n{fixing}")
         for permuted_cs in permutations(self.cs):
+            logger.debug(f"Checking ordering {permuted_cs}")
             C_permuted = Constraints(list(permuted_cs))
             if C_permuted.is_solution_ordering(fixing):
                 logger.info(f"Found solution ordering {permuted_cs}")
@@ -134,7 +136,7 @@ class Constraints:
 
         # todo len
         for partition in tqdm(set_partitions(range(n)), total=bell_number(n)):
-            logger.info(f"collapsing {partition}")
+            logger.debug(f"collapsing {partition}")
             collapsed_C, subspace = self.collapse(partition)
             collapsed_fixing = fixing @ subspace
             if collapsed_C.is_proper() and collapsed_C.is_solvable(collapsed_fixing):
@@ -148,7 +150,11 @@ class Constraints:
         def is_outside_W(subspace):
             W_plus = stack_matrices(W, subspace, axis=1).column_space()
             assert len(W_plus) >= dim_W
-            return len(W_plus) > dim_W
+            if len(W_plus) > dim_W:
+                logger.debug(f"subspace:\n{subspace} is outside of W:\n{W}")
+                return True
+            else:
+                return False
 
         return filter(
             lambda t: is_outside_W(t[1]), self.find_solvable_subspaces(fixing)

@@ -35,9 +35,9 @@ class Constraint(ABC):
     def is_proper(self, fixed_constraints: list[Self]) -> bool:
         pass
 
-    @abstractmethod
     def __eq__(self, other) -> bool:
-        pass
+        assert type(other) is type(self)
+        return (self.fixing_matrix() == other.fixing_matrix()).all()
 
     @abstractmethod
     def __repr__(self) -> str:

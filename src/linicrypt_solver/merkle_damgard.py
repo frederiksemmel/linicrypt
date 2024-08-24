@@ -38,10 +38,10 @@ class PGVComporessionFunction:
         )
         return f"E({c}h + {d}m, {e}h + {f}m) + {a}h + {b}m\t PGV: {self.pgv_category()}, BRS: {self.brs_category()}"
 
-    def compute_x(self):
+    def compute_k(self):
         return GF([[self.params.c, self.params.d, 0]])
 
-    def compute_k(self):
+    def compute_x(self):
         return GF([[self.params.e, self.params.f, 0]])
 
     def compute_y(self):
@@ -183,4 +183,38 @@ class PGVComporessionFunction:
             md_construction = md_construction.map(collapse_f)
             # logger.debug(f"Collapse with:\n{collapse_f}")
 
+        # Add the input IV constant back to the output
+        iv = GF.Zeros((1, md_construction.dim()))
+        iv[0][0] = 1
+        md_construction.output = stack_matrices(iv, md_construction.output)
+
+        return md_construction
+
+    def construct_MD_2(self, n: int, basis: str = "merkle-damgard"):
+        md_construction = self.algebraic_rep(basis)
+        for _ in range(2, n + 1):
+            dim = md_construction.dim()
+            f_right = self.algebraic_rep(basis).embed_right(dim + 3)
+            md_construction = md_construction.embed_left(dim + 3)
+            # collapse the first input of this compression function
+            # with the output of the ent constraints
+            first_input = f_right.fixing[:1]
+            prev_output = md_construction.output[-1:]
+
+            collapse_f = GF(first_input - prev_output).null_space().transpose()
+            md_construction.merge(f_right)
+            # we need to remove the first input from the inputs of H_n
+            md_construction.fixing = GF(np.delete(md_construction.fixing, -2, 0))
+            # we just take the last output as the output of MD
+            md_construction.output = GF(md_construction.output[-1:])
+            # logger.debug(md_construction)
+            md_construction = md_construction.map(collapse_f)
+            # logger.debug(f"Collapse with:\n{collapse_f}")
+
+        # Add the input IV constraint
+        zero = GF.Zeros((1, md_construction.dim()))
+        iv = md_construction.fixing[:1]
+        md_construction.fixing = GF(np.delete(md_construction.fixing, 0, 0))
+        iv_constraint = ConstraintE(zero, zero, iv)
+        md_construction.cs.add(iv_constraint)
         return md_construction

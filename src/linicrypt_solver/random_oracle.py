@@ -47,6 +47,3 @@ class ConstraintH(Constraint):
 
     def __repr__(self):
         return f"{self.q[0]} |-> {self.a[0]}"
-
-    def __eq__(self, other) -> bool:
-        return (self.q == other.q).all() and (self.a == other.a).all()

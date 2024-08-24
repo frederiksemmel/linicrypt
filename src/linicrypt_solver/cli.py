@@ -34,22 +34,27 @@ def test_cr():
     print(f"{program} is 2PR: {program.is_second_preimage_resistant()}")
 
 
+def test_MD_with(a, b, c, d, e, f):
+    params = PGVParams(a, b, c, d, e, f)
+    pgv_f = PGVComporessionFunction(params)
+    # if pgv_f.pgv_category()[0] != "B":
+    #     continue
+    print(pgv_f)
+    n = 2
+    H_n = pgv_f.construct_MD(n)
+    logger.info(f"H_n:\n{H_n}")
+    # print(H_n.cs.is_solvable(fixing=H_n.fixing))
+    print(f"Collision resistant: {H_n.is_collision_resistant()}")
+    # print(f"Collision resistant: {H_n.is_second_preimage_resistant()}")
+    # break
+
+
 def test_MD():
-    for a, b, c, d, e, f in product([0, 1], repeat=6):
-        params = PGVParams(a, b, c, d, e, f)
-        pgv_f = PGVComporessionFunction(params)
-        if pgv_f.pgv_category()[0] != "B":
-            continue
-        print(pgv_f)
-        n = 2
-        H_n = pgv_f.construct_MD(n)
-        print(f"H_n:\n{H_n}")
-        # print(H_n.cs.is_solvable(fixing=H_n.fixing))
-        print(f"Collision resistant: {H_n.is_collision_resistant()}")
-        # print(f"Collision resistant: {H_n.is_second_preimage_resistant()}")
-        break
+    for params in product([0, 1], repeat=6):
+        test_MD_with(*params)
 
 
 if __name__ == "__main__":
     # test_cr()
     test_MD()
+    # test_MD_with(1, 0, 1, 1, 1, 0)

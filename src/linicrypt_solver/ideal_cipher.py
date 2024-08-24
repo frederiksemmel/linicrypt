@@ -42,28 +42,31 @@ class ConstraintE(Constraint):
         return ConstraintE(x, k, y)
 
     def is_solvable_enc(self, fixing: FieldArray) -> bool:
-        fixing = GF(np.concatenate((fixing, self.x, self.k))).row_space()
-        new_fixing_space = stack_matrices(fixing, self.y).row_space()
-        assert len(fixing) <= len(new_fixing_space)
-        if len(fixing.row_space()) == len(new_fixing_space.row_space()):
-            logger.debug(
-                f"solvable_enc: y = {self.y} is contained in:\n{fixing} + <x,k>"
-            )
+        fixing_xk = GF(np.concatenate((fixing, self.x, self.k))).row_space()
+        new_fixing_space = stack_matrices(fixing_xk, self.y).row_space()
+        assert len(fixing_xk) <= len(new_fixing_space)
+        if len(fixing_xk.row_space()) == len(new_fixing_space.row_space()):
             return False
-        return True
+        else:
+            logger.debug(
+                f"solvable_enc: y = {self.y} is not contained in:\n{fixing} + <x,k>"
+            )
+            return True
 
     def is_solvable_dec(self, fixing: FieldArray) -> bool:
         fixing = GF(np.concatenate((fixing, self.k, self.y))).row_space()
         new_fixing_space = stack_matrices(fixing, self.x).row_space()
         assert len(fixing) <= len(new_fixing_space)
         if len(fixing.row_space()) == len(new_fixing_space.row_space()):
-            logger.debug(
-                f"solvable_dec: x = {self.x} is contained in:\n{fixing} + <k,y>"
-            )
             return False
-        return True
+        else:
+            logger.debug(
+                f"solvable_dec: x = {self.x} is not contained in:\n{fixing} + <k,y>"
+            )
+            return True
 
     def is_solvable(self, fixing: FieldArray) -> bool:
+        logger.debug(f"checking solvable of:\n{self}\nfixing:\n{fixing}")
         return self.is_solvable_enc(fixing) or self.is_solvable_dec(fixing)
 
     def is_proper(self, fixed_constraints: list["ConstraintE"]) -> bool:
