@@ -13,7 +13,7 @@ need to activate the venv with `source ./.venv/bin/activate` in bash.
 ## Results from the galois implementation of the CR corollary
 
 The implementation in `src/linicrypt_solver` consists mainly of these modules:
-- `field.py`: Definition of the field that is used. I am using the prime order field $F_29$
+- `field.py`: Definition of the field that is used. I am using the prime order field $F_{29}$
 - `__init__.py`: Defines the interface/trait `Constraint`
 - `random_oracle.py`: Constraint is implemented for the Random Oracle constraints
 - `ideal_cipher.py`: Constraint is implemented for Ideal Cipher constraints
