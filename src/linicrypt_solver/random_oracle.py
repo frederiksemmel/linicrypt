@@ -20,10 +20,8 @@ class ConstraintH(Constraint):
         self.q = GF(q)
         self.a = GF(a)
 
-    def difference_matrix(self, other: "ConstraintH") -> FieldArray:
-        q_row = self.q - other.q
-        a_row = self.a - other.a
-        return stack_matrices(q_row, a_row)
+    def fixing_matrix(self) -> FieldArray:
+        return stack_matrices(self.q, self.a)
 
     def map(self, f: FieldArray) -> "ConstraintH":
         q = self.q @ f
@@ -35,17 +33,17 @@ class ConstraintH(Constraint):
         return self.a.shape[1]
 
     # Returns the new fixed space
-    def is_solvable(self, fixing: FieldArray) -> None | FieldArray:
+    def is_solvable(self, fixing: FieldArray) -> bool:
         fixing = stack_matrices(fixing, self.q).row_space()
         new_fixing_space = stack_matrices(fixing, self.a).row_space()
         assert len(fixing) <= len(new_fixing_space)
         if len(fixing.row_space()) == len(new_fixing_space.row_space()):
-            logger.debug(f"{self.a} is contained in {fixing}")
-            return None
-        return new_fixing_space
+            logger.debug(f"{self.a} is contained in:\n{fixing}")
+            return False
+        return True
 
     def is_proper(self, fixed_constraints: list[Self]) -> bool:
-        return all(c.q != self.q for c in fixed_constraints)
+        return all((c.q != self.q).any() for c in fixed_constraints)
 
     def __repr__(self):
         return f"{self.q[0]} |-> {self.a[0]}"

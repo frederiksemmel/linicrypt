@@ -72,13 +72,26 @@ class AlgebraicRep:
         preimage_S = f_pullback_S_0.null_space().transpose()
         assert (f @ preimage_S == S).all()
 
+        def is_outside_S(subspace):
+            W_plus = stack_matrices(S, subspace, axis=1).column_space()
+            assert len(W_plus) >= self.dim()
+            return len(W_plus) > self.dim()
+
         C_joined_f = C_join.map(f)
-        subspaces = C_joined_f.find_solvable_subspaces_outside(preimage_S)
-        for part, subspace in subspaces:
+        subspaces_iter = C_joined_f.find_solvable_subspaces_outside(preimage_S)
+        for part, subspace in subspaces_iter:
+            logger.info("Found solvable subspace:")
             logger.info(part)
             logger.info(subspace)
-
-        return len(subspaces) == 0
+            solution = C_joined_f.map(subspace)
+            logger.info(solution)
+            dim = solution.dim()
+            logger.info(f @ subspace)
+            logger.info(C_join.map(f @ subspace))
+            assert is_outside_S(f @ subspace)
+            # logger.info(C_joined_f.map(subspace).is_solvable(fixing=GF.Zeros((1, dim))))
+            return False
+        return True
 
     def is_second_preimage_resistant(self):
         S = stack_matrices(GF.Identity(self.dim()), GF.Identity(self.dim()))
@@ -102,9 +115,11 @@ class AlgebraicRep:
         logger.debug(f"Left input after pullback is:\n{I_1_f}")
 
         C_joined_f = C_join.map(f)
-        subspaces = C_joined_f.find_solvable_subspaces_outside(preimage_S, fixing=I_1_f)
-        for part, subspace in subspaces:
+        subspaces_iter = C_joined_f.find_solvable_subspaces_outside(
+            preimage_S, fixing=I_1_f
+        )
+        for part, subspace in subspaces_iter:
             logger.info(part)
             logger.info(subspace)
-
-        return len(subspaces) == 0
+            return False
+        return True

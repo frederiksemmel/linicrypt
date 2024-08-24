@@ -179,8 +179,8 @@ class PGVComporessionFunction:
             md_construction.fixing = GF(np.delete(md_construction.fixing, -2, 0))
             # we just take the last output as the output of MD
             md_construction.output = GF(md_construction.output[-1:])
-            logger.debug(md_construction)
+            # logger.debug(md_construction)
             md_construction = md_construction.map(collapse_f)
-            logger.debug(f"Collapse with:\n{collapse_f}")
+            # logger.debug(f"Collapse with:\n{collapse_f}")
 
         return md_construction

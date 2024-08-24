@@ -9,8 +9,14 @@ from linicrypt_solver.field import GF
 
 # TODO flesh out interface and add make constraints work with both types of constraints simultaneously
 class Constraint(ABC):
-    @abstractmethod
     def difference_matrix(self, other: Self) -> FieldArray:
+        fixing_self = self.fixing_matrix()
+        fixing_other = other.fixing_matrix()
+        assert fixing_self.shape == fixing_other.shape
+        return fixing_self - fixing_other
+
+    @abstractmethod
+    def fixing_matrix(self) -> FieldArray:
         pass
 
     @abstractmethod
@@ -22,7 +28,7 @@ class Constraint(ABC):
         pass
 
     @abstractmethod
-    def is_solvable(self, fixing: FieldArray) -> None | FieldArray:
+    def is_solvable(self, fixing: FieldArray) -> bool:
         pass
 
     @abstractmethod

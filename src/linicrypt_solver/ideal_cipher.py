@@ -32,11 +32,8 @@ class ConstraintE(Constraint):
         self.k = k
         self.y = y
 
-    def difference_matrix(self, other: "ConstraintE") -> FieldArray:
-        x_diff = self.x - other.x
-        k_diff = self.k - other.k
-        y_diff = self.y - other.y
-        return GF(np.concatenate((x_diff, k_diff, y_diff)))
+    def fixing_matrix(self) -> FieldArray:
+        return GF(np.concatenate((self.x, self.k, self.y)))
 
     def map(self, f: FieldArray) -> "ConstraintE":
         x = self.x @ f
@@ -44,39 +41,42 @@ class ConstraintE(Constraint):
         y = self.y @ f
         return ConstraintE(x, k, y)
 
-    def is_solvable_enc(self, fixing: FieldArray) -> None | FieldArray:
+    def is_solvable_enc(self, fixing: FieldArray) -> bool:
         fixing = GF(np.concatenate((fixing, self.x, self.k))).row_space()
         new_fixing_space = stack_matrices(fixing, self.y).row_space()
         assert len(fixing) <= len(new_fixing_space)
         if len(fixing.row_space()) == len(new_fixing_space.row_space()):
             logger.debug(
-                f"solvable_enc: y = {self.y} is contained in:\n{fixing} + <x,y>"
+                f"solvable_enc: y = {self.y} is contained in:\n{fixing} + <x,k>"
             )
-            return None
-        return new_fixing_space
+            return False
+        return True
 
-    def is_solvable_dec(self, fixing: FieldArray) -> None | FieldArray:
+    def is_solvable_dec(self, fixing: FieldArray) -> bool:
         fixing = GF(np.concatenate((fixing, self.k, self.y))).row_space()
         new_fixing_space = stack_matrices(fixing, self.x).row_space()
         assert len(fixing) <= len(new_fixing_space)
         if len(fixing.row_space()) == len(new_fixing_space.row_space()):
             logger.debug(
-                f"solvable_dec: y = {self.y} is contained in:\n{fixing} + <x,y>"
+                f"solvable_dec: x = {self.x} is contained in:\n{fixing} + <k,y>"
             )
-            return None
-        return new_fixing_space
+            return False
+        return True
 
-    def is_solvable(self, fixing: FieldArray) -> None | FieldArray:
-        enc_space = self.is_solvable_enc(fixing)
-        dec_space = self.is_solvable_dec(fixing)
-        if enc_space is None and dec_space is None:
-            return None
-        return enc_space
+    def is_solvable(self, fixing: FieldArray) -> bool:
+        return self.is_solvable_enc(fixing) or self.is_solvable_dec(fixing)
 
-    def is_proper(self, fixed_constraints: list[Self]) -> bool:
-        xk_different = all((c.x, c.k) != (self.x, self.k) for c in fixed_constraints)
-        ky_different = all((c.k, c.y) != (self.k, self.y) for c in fixed_constraints)
-        return xk_different and ky_different
+    def is_proper(self, fixed_constraints: list["ConstraintE"]) -> bool:
+        my_matrix = self.fixing_matrix()
+        my_xk = my_matrix[:2]
+        my_ky = my_matrix[1:]
+        for c in fixed_constraints:
+            c_matrix = c.fixing_matrix()
+            xk = c_matrix[:2]
+            ky = c_matrix[1:]
+            if (my_xk == xk).all() or (my_ky == ky).all():
+                return False
+        return True
 
     def dim(self):
         return self.k.shape[1]

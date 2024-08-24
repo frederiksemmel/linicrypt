@@ -1,15 +1,20 @@
 from itertools import pairwise, permutations
+from typing import Iterator
 
-from linicrypt_solver.field import GF
+import numpy as np
 from galois import FieldArray
 from loguru import logger
 from more_itertools import set_partitions
 from tqdm import tqdm
 
 from linicrypt_solver import Constraint, DualVector
+from linicrypt_solver.field import GF
 from linicrypt_solver.ideal_cipher import ConstraintE
 from linicrypt_solver.random_oracle import ConstraintH
 from linicrypt_solver.utils import stack_matrices
+
+
+Partition = list[list[int]]
 
 
 class Constraints:
@@ -56,23 +61,19 @@ class Constraints:
                 return False
         return True
 
-    def is_solution_ordering(self, fixing: FieldArray | None = None) -> bool:
+    def is_solution_ordering(self, fixing: FieldArray) -> bool:
         if len(self.cs) == 0:
             return True
         dim = self.dim()
-        if fixing is None:
-            fixing = GF.Zeros((1, dim))
-        else:
-            assert fixing.shape[1] == dim
+        assert fixing.shape[1] == dim
         for i, c in enumerate(self.cs):
-            new_fixing = c.is_solvable(fixing)
-            if new_fixing is None:
+            if not c.is_solvable(fixing):
                 logger.debug(f"Not solution ordering because of {i}: {c}")
                 return False
-            fixing = new_fixing
+            fixing = stack_matrices(fixing, c.fixing_matrix()).row_space()
         return True
 
-    def is_solvable(self, fixing: FieldArray | None = None) -> bool:
+    def is_solvable_brute_force(self, fixing: FieldArray) -> bool:
         for permuted_cs in permutations(self.cs):
             C_permuted = Constraints(list(permuted_cs))
             if C_permuted.is_solution_ordering(fixing):
@@ -80,12 +81,51 @@ class Constraints:
                 return True
         return False
 
+    def is_solvable(self, fixing: FieldArray) -> bool:
+        ordering = []
+        remaining = self.cs  # we are not modifying remaing, so this is ok
+        # We go through self.cs and choose a constraint that is solvable
+        # Then we repeat the process until we have an ordering
+        # If an ordering exists, then this process will find an ordering (might be a different one)
+        # Need to prove this across different constraint types
+
+        # This while loop will finish in <= n loops
+        while len(remaining) > 0:
+            # TODO Use a function from itertools or more_itertools to partition remaining into a singleton set and the rest
+            for i in range(len(remaining)):
+                c = remaining[i]
+                rest = remaining[:i] + remaining[i + 1 :]
+                # Check if the constraint can be solved given the fixing of the rest
+                # If it can, add it to the ordering and update the remaining constraints
+                # If it cannot, continue the loop
+                fixing_rest = GF(
+                    np.concatenate([c.fixing_matrix() for c in rest] + [fixing])
+                )
+                logger.debug(f"c=\n{c}")
+                logger.debug(f"rest=\n{rest}")
+                logger.debug(f"fixing_rest=\n{fixing_rest}")
+                if c.is_solvable(fixing_rest):
+                    logger.debug(f"solving remaining {len(remaining)}: {c} is solvable")
+                    ordering = [c] + ordering
+                    remaining = rest
+                    break
+            # here we have found no solvable constraint, so the whole set has to be unsolvable
+            else:
+                logger.debug(f"solving remaining {len(remaining)}: nothing is solvable")
+                return False
+
+        # If we completed the while loop, ordering is a solution ordering
+        assert Constraints(ordering).is_solution_ordering(fixing)
+        return True
+
     def find_solvable_subspaces(
         self, fixing: FieldArray | None = None
-    ) -> list[tuple[tuple[int, ...], FieldArray]]:
+    ) -> Iterator[tuple[Partition, FieldArray]]:
+        if fixing is None:
+            fixing = GF.Zeros((1, self.dim()))
         n = len(self.cs)
 
-        subspaces = []
+        # subspaces = []
 
         # https://codegolf.stackexchange.com/questions/132379/output-the-n-th-bell-number
         # https://en.wikipedia.org/wiki/Partition_of_a_set
@@ -96,16 +136,13 @@ class Constraints:
         for partition in tqdm(set_partitions(range(n)), total=bell_number(n)):
             logger.info(f"collapsing {partition}")
             collapsed_C, subspace = self.collapse(partition)
-            collapsed_fixing = None
-            if fixing is not None:
-                collapsed_fixing = fixing @ subspace
-            if collapsed_C.is_solvable(collapsed_fixing):
-                subspaces.append((partition, subspace))
-        return subspaces
+            collapsed_fixing = fixing @ subspace
+            if collapsed_C.is_proper() and collapsed_C.is_solvable(collapsed_fixing):
+                yield (partition, subspace)
 
     def find_solvable_subspaces_outside(
         self, W: FieldArray, fixing: FieldArray | None = None
-    ) -> list[tuple[tuple[int, ...], FieldArray]]:
+    ) -> Iterator[tuple[Partition, FieldArray]]:
         dim_W = len(W.column_space())
 
         def is_outside_W(subspace):
@@ -113,11 +150,9 @@ class Constraints:
             assert len(W_plus) >= dim_W
             return len(W_plus) > dim_W
 
-        return [
-            (part, subspace)
-            for part, subspace in self.find_solvable_subspaces(fixing)
-            if is_outside_W(subspace)
-        ]
+        return filter(
+            lambda t: is_outside_W(t[1]), self.find_solvable_subspaces(fixing)
+        )
 
     def collapse_pair(self, i: int, j: int) -> "Constraints":
         assert i != j
@@ -138,7 +173,6 @@ class Constraints:
         diff = GF.Zeros((1, d))
         for collapse in partition:
             for i, j in pairwise(collapse):
-                logger.debug(f"in collapse collapsing {i},{j}")
                 diff = stack_matrices(diff, self.cs[i].difference_matrix(self.cs[j]))
 
         logger.debug(f"diff matrix:\n{diff}")
