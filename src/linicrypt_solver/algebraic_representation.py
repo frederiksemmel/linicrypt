@@ -70,6 +70,10 @@ class AlgebraicRep:
         f_pullback_S_0 = S_0 @ f
         # We have f^-1(S) = f^*(S^0))^0. Because S is in the image of f, this f(f^-1(S)) = S
         preimage_S = f_pullback_S_0.null_space().transpose()
+        # This could be wrong, because preimage_S might be a different basis
+        # of the same subspace. But it seems the left_null_space and null_space
+        # algorithms of the galois package are such that this actually works.
+        # So each column of preimage_S is actually the preimage of each column of S
         assert (f @ preimage_S == S).all()
 
         def is_outside_S(subspace):
@@ -81,15 +85,12 @@ class AlgebraicRep:
         subspaces_iter = C_joined_f.find_solvable_subspaces_outside(preimage_S)
         for part, subspace in subspaces_iter:
             logger.info("Found solvable subspace:")
-            logger.info(part)
-            logger.info(subspace)
-            solution = C_joined_f.map(subspace)
-            logger.info(solution)
-            dim = solution.dim()
+            logger.info(f"Partition of the constraints is {part}")
+            logger.info("Solvable subspace of F^(2d) is")
             logger.info(f @ subspace)
+            logger.info("Solvable constraints in that subspace are")
             logger.info(C_join.map(f @ subspace))
             assert is_outside_S(f @ subspace)
-            # logger.info(C_joined_f.map(subspace).is_solvable(fixing=GF.Zeros((1, dim))))
             return False
         return True
 

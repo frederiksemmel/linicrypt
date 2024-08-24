@@ -12,7 +12,7 @@ from linicrypt_solver.solvable import Constraints
 logger.remove()  # Remove the default handler
 logger.add(
     sink=sys.stderr,
-    level="WARNING",
+    level="INFO",
     format="{time:YYYY-MM-DD HH:mm:ss} | {level}\n{message}",  # Add newline before {message}
 )
 
@@ -30,8 +30,9 @@ def test_cr():
     program = AlgebraicRep(constraints, fixing, output)
     # print(program)
     # program.cs.is_solvable(fixing=program.fixing)
-    print(f"{program} is CR: {program.is_collision_resistant()}")
-    print(f"{program} is 2PR: {program.is_second_preimage_resistant()}")
+    print(f"The program\n{program}\n")
+    print(f"is CR: {program.is_collision_resistant()}")
+    print(f"is 2PR: {program.is_second_preimage_resistant()}")
 
 
 def test_MD_with(a, b, c, d, e, f):
@@ -40,9 +41,9 @@ def test_MD_with(a, b, c, d, e, f):
     # if pgv_f.pgv_category()[0] != "B":
     #     continue
     print(pgv_f)
-    n = 2
+    n = 3
     H_n = pgv_f.construct_MD(n)
-    logger.info(f"H_n:\n{H_n}")
+    logger.debug(f"H_n:\n{H_n}")
     # print(H_n.cs.is_solvable(fixing=H_n.fixing))
     print(f"Collision resistant: {H_n.is_collision_resistant()}")
     # print(f"Collision resistant: {H_n.is_second_preimage_resistant()}")
@@ -55,6 +56,6 @@ def test_MD():
 
 
 if __name__ == "__main__":
-    # test_cr()
-    test_MD()
+    test_cr()
+    # test_MD()
     # test_MD_with(1, 0, 1, 1, 1, 0)

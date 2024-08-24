@@ -83,7 +83,7 @@ class Constraints:
                 return True
         return False
 
-    def is_solvable(self, fixing: FieldArray) -> bool:
+    def find_solution_ordering(self, fixing: FieldArray) -> "None | Constraints":
         ordering = []
         remaining = self.cs  # we are not modifying remaing, so this is ok
         # We go through self.cs and choose a constraint that is solvable
@@ -114,11 +114,11 @@ class Constraints:
             # here we have found no solvable constraint, so the whole set has to be unsolvable
             else:
                 logger.debug(f"solving remaining {len(remaining)}: nothing is solvable")
-                return False
+                return None
 
         # If we completed the while loop, ordering is a solution ordering
         assert Constraints(ordering).is_solution_ordering(fixing)
-        return True
+        return Constraints(ordering)
 
     def find_solvable_subspaces(
         self, fixing: FieldArray | None = None
@@ -126,8 +126,6 @@ class Constraints:
         if fixing is None:
             fixing = GF.Zeros((1, self.dim()))
         n = len(self.cs)
-
-        # subspaces = []
 
         # https://codegolf.stackexchange.com/questions/132379/output-the-n-th-bell-number
         # https://en.wikipedia.org/wiki/Partition_of_a_set
@@ -139,7 +137,9 @@ class Constraints:
             logger.debug(f"collapsing {partition}")
             collapsed_C, subspace = self.collapse(partition)
             collapsed_fixing = fixing @ subspace
-            if collapsed_C.is_proper() and collapsed_C.is_solvable(collapsed_fixing):
+            if collapsed_C.is_proper() and collapsed_C.find_solution_ordering(
+                collapsed_fixing
+            ):
                 yield (partition, subspace)
 
     def find_solvable_subspaces_outside(
@@ -156,9 +156,26 @@ class Constraints:
             else:
                 return False
 
-        return filter(
-            lambda t: is_outside_W(t[1]), self.find_solvable_subspaces(fixing)
-        )
+        if fixing is None:
+            fixing = GF.Zeros((1, self.dim()))
+        n = len(self.cs)
+
+        # https://codegolf.stackexchange.com/questions/132379/output-the-n-th-bell-number
+        # https://en.wikipedia.org/wiki/Partition_of_a_set
+        def bell_number(n, k=0):
+            return n < 1 or k * bell_number(n - 1, k) + bell_number(n - 1, k + 1)
+
+        # todo len
+        for partition in tqdm(set_partitions(range(n)), total=bell_number(n)):
+            logger.debug(f"collapsing {partition}")
+            collapsed_C, subspace = self.collapse(partition)
+            if not is_outside_W(subspace):
+                continue
+            collapsed_fixing = fixing @ subspace
+            if collapsed_C.is_proper() and collapsed_C.find_solution_ordering(
+                collapsed_fixing
+            ):
+                yield (partition, subspace)
 
     def collapse_pair(self, i: int, j: int) -> "Constraints":
         assert i != j
