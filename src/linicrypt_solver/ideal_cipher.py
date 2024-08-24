@@ -82,11 +82,7 @@ class ConstraintE(Constraint):
         return self.k.shape[1]
 
     def components(self) -> FieldArray:
-        return GF(np.concatenate((self.x, self.x, self.y)))
+        return GF(np.concatenate((self.x, self.k, self.y)))
 
     def __repr__(self):
         return f"{self.x[0]} <- {self.k[0]} -> {self.y[0]}"
-
-    def __eq__(self, other) -> bool:
-        assert isinstance(other, ConstraintE)
-        return (self.components() == other.components()).all()
