@@ -13,11 +13,11 @@ logger.remove()  # Remove the default handler
 logger.add(
     sink=sys.stderr,
     level="INFO",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level}\n{message}",  # Add newline before {message}
+    format="{level}\n{message}",  # Add newline before {message}
 )
 
 
-def test_cr():
+def example_no_nonces() -> AlgebraicRep:
     constraints = Constraints.from_repr(
         [
             ([1, 0, 0, 0, 0], [0, 0, 1, 0, 0]),
@@ -27,12 +27,32 @@ def test_cr():
     )
     fixing = GF([[1, 0, 0, 0, 0], [0, 1, 0, 0, 0]])
     output = GF([[0, 0, 0, 1, 1]])
-    program = AlgebraicRep(constraints, fixing, output)
-    # print(program)
-    # program.cs.is_solvable(fixing=program.fixing)
+    return AlgebraicRep(constraints, fixing, output)
+
+
+def running_example() -> AlgebraicRep:
+    constraints = Constraints.from_repr(
+        [
+            ([1, 0, 0, 0, 0, 0], [0, 0, 0, 1, 0, 0]),
+            ([0, 0, 1, 0, 0, 0], [0, 0, 0, 0, 1, 0]),
+            ([0, 1, 1, 1, 0, 0], [0, 0, 0, 0, 0, 1]),
+        ]
+    )
+    fixing = GF([[1, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0]])
+    output = GF([[1, 0, 0, 0, 0, 1], [0, 0, 0, 0, 1, 0]])
+    return AlgebraicRep(constraints, fixing, output)
+
+
+def test_cr():
+    program = running_example()
     print(f"The program\n{program}\n")
-    print(f"is CR: {program.is_collision_resistant()}")
-    print(f"is 2PR: {program.is_second_preimage_resistant()}")
+    attacks = list(program.list_collision_attacks())
+    for attack in attacks:
+        partition, subspace, solution = attack
+        print(f"partition:\n{partition}")
+        print(f"subspace:\n{subspace}")
+        print(f"solution:\n{solution}")
+    # print(f"2PR attacks:\n{list(program.list_second_preimage_attacks())}")
 
 
 def test_MD_with(a, b, c, d, e, f):
@@ -41,7 +61,7 @@ def test_MD_with(a, b, c, d, e, f):
     # if pgv_f.pgv_category()[0] != "B":
     #     continue
     print(pgv_f)
-    n = 3
+    n = 4
     H_n = pgv_f.construct_MD(n)
     logger.debug(f"H_n:\n{H_n}")
     # print(H_n.cs.is_solvable(fixing=H_n.fixing))

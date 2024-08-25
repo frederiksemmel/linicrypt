@@ -184,9 +184,9 @@ class PGVComporessionFunction:
             # logger.debug(f"Collapse with:\n{collapse_f}")
 
         # Add the input IV constant back to the output
-        iv = GF.Zeros((1, md_construction.dim()))
-        iv[0][0] = 1
-        md_construction.output = stack_matrices(iv, md_construction.output)
+        # iv = GF.Zeros((1, md_construction.dim()))
+        # iv[0][0] = 1
+        # md_construction.output = stack_matrices(iv, md_construction.output)
 
         return md_construction
 

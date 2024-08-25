@@ -1,10 +1,13 @@
 import numpy as np
 from galois import FieldArray
 from loguru import logger
+from typing import Iterator
 
 from linicrypt_solver.field import GF
-from linicrypt_solver.solvable import Constraints
+from linicrypt_solver.solvable import Constraints, Partition
 from linicrypt_solver.utils import stack_matrices, embed_left, embed_right
+
+Attack = tuple[Partition, FieldArray, Constraints]
 
 
 class AlgebraicRep:
@@ -56,7 +59,7 @@ class AlgebraicRep:
         ]
         return "\n".join(lines)
 
-    def is_collision_resistant(self):
+    def list_collision_attacks(self) -> Iterator[Attack]:
         S = stack_matrices(GF.Identity(self.dim()), GF.Identity(self.dim()))
         C_join = self.cs.construct_joined()
         dim = C_join.dim()
@@ -89,12 +92,18 @@ class AlgebraicRep:
             logger.info("Solvable subspace of F^(2d) is")
             logger.info(f @ subspace)
             logger.info("Solvable constraints in that subspace are")
-            logger.info(C_join.map(f @ subspace))
+            collapsed_constraints = C_join.map(f @ subspace)
+            zero = GF.Zeros((1, collapsed_constraints.dim()))
+            solution = collapsed_constraints.find_solution_ordering(fixing=zero)
+            logger.info(solution)
+            assert solution is not None
             assert is_outside_S(f @ subspace)
-            return False
-        return True
+            yield (part, f @ subspace, C_join.map(f @ subspace))
 
-    def is_second_preimage_resistant(self):
+    def is_collision_resistant(self):
+        return any(True for _ in self.list_collision_attacks())
+
+    def list_second_preimage_attacks(self):
         S = stack_matrices(GF.Identity(self.dim()), GF.Identity(self.dim()))
         C_join = self.cs.construct_joined()
         dim = C_join.dim()
@@ -122,5 +131,7 @@ class AlgebraicRep:
         for part, subspace in subspaces_iter:
             logger.info(part)
             logger.info(subspace)
-            return False
-        return True
+            yield (part, f @ subspace, C_join.map(f @ subspace))
+
+    def is_second_preimage_resistant(self):
+        return any(True for _ in self.list_second_preimage_attacks())
