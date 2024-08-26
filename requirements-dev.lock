@@ -17,6 +17,8 @@ executing==2.0.1
     # via stack-data
 galois==0.4.1
     # via linicrypt-solver
+iniconfig==2.0.0
+    # via pytest
 ipython==8.23.0
 jedi==0.19.1
     # via ipython
@@ -35,10 +37,14 @@ numba==0.60.0
 numpy==2.0.1
     # via galois
     # via numba
+packaging==24.1
+    # via pytest
 parso==0.8.4
     # via jedi
 pexpect==4.9.0
     # via ipython
+pluggy==1.5.0
+    # via pytest
 prompt-toolkit==3.0.43
     # via ipython
 ptyprocess==0.7.0
@@ -47,6 +53,7 @@ pure-eval==0.2.2
     # via stack-data
 pygments==2.17.2
     # via ipython
+pytest==8.3.2
 six==1.16.0
     # via asttokens
 stack-data==0.6.3

@@ -12,7 +12,7 @@ from linicrypt_solver.solvable import Constraints
 logger.remove()  # Remove the default handler
 logger.add(
     sink=sys.stderr,
-    level="INFO",
+    level="WARNING",
     format="{level}\n{message}",  # Add newline before {message}
 )
 
@@ -43,15 +43,14 @@ def running_example() -> AlgebraicRep:
     return AlgebraicRep(constraints, fixing, output)
 
 
-def test_cr():
-    program = running_example()
-    print(f"The program\n{program}\n")
-    attacks = list(program.list_collision_attacks())
-    for attack in attacks:
-        partition, subspace, solution = attack
-        print(f"partition:\n{partition}")
-        print(f"subspace:\n{subspace}")
-        print(f"solution:\n{solution}")
+def test_cr(program: AlgebraicRep):
+    attacks = list(program.all_maximal_collision_attacks())
+    if len(attacks) == 0:
+        print(f"The program\n{program}\nis Collision Resistant")
+    else:
+        print(f"The program\n{program}\nhas the following maximal attacks")
+        for attack in attacks:
+            print(f"{attack}")
     # print(f"2PR attacks:\n{list(program.list_second_preimage_attacks())}")
 
 
@@ -61,13 +60,10 @@ def test_MD_with(a, b, c, d, e, f):
     # if pgv_f.pgv_category()[0] != "B":
     #     continue
     print(pgv_f)
-    n = 4
+    n = 2
     H_n = pgv_f.construct_MD(n)
     logger.debug(f"H_n:\n{H_n}")
-    # print(H_n.cs.is_solvable(fixing=H_n.fixing))
-    print(f"Collision resistant: {H_n.is_collision_resistant()}")
-    # print(f"Collision resistant: {H_n.is_second_preimage_resistant()}")
-    # break
+    test_cr(H_n)
 
 
 def test_MD():
@@ -76,6 +72,6 @@ def test_MD():
 
 
 if __name__ == "__main__":
-    test_cr()
-    # test_MD()
+    # test_cr(running_example())
+    test_MD()
     # test_MD_with(1, 0, 1, 1, 1, 0)
