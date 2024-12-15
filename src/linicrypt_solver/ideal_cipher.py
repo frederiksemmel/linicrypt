@@ -41,6 +41,22 @@ class ConstraintE(Constraint):
         y = self.y @ f
         return ConstraintE(x, k, y)
 
+    def is_solvale_fixed_point(self, fixing: FieldArray) -> bool:
+        fixing = fixing.row_space()
+        fixing_and_k = stack_matrices(fixing, self.k).row_space()
+        fixing_and_xky = GF(
+            np.concatenate((fixing, self.x, self.k, self.y))
+        ).row_space()
+        k_unconstrained = len(fixing) < len(fixing_and_k)
+        xy_unconstrained = len(fixing_and_k) < len(fixing_and_xky)
+        k_unconstrained = True
+        # xy_unconstrained = True
+        if (self.x == self.y).all() and k_unconstrained and xy_unconstrained:
+            logger.warning(f"solvable_fixed_point: x = {self.x} = {self.y} = y")
+            return True
+        else:
+            return False
+
     def is_solvable_enc(self, fixing: FieldArray) -> bool:
         fixing_xk = GF(np.concatenate((fixing, self.x, self.k))).row_space()
         new_fixing_space = stack_matrices(fixing_xk, self.y).row_space()
@@ -67,7 +83,11 @@ class ConstraintE(Constraint):
 
     def is_solvable(self, fixing: FieldArray) -> bool:
         logger.debug(f"checking solvable of:\n{self}\nfixing:\n{fixing}")
-        return self.is_solvable_enc(fixing) or self.is_solvable_dec(fixing)
+        return (
+            self.is_solvable_enc(fixing)
+            or self.is_solvable_dec(fixing)
+            or self.is_solvale_fixed_point(fixing)
+        )
 
     def is_proper(self, fixed_constraints: list["ConstraintE"]) -> bool:
         my_matrix = self.fixing_matrix()
@@ -79,6 +99,22 @@ class ConstraintE(Constraint):
             ky = c_matrix[1:]
             if (my_xk == xk).all() or (my_ky == ky).all():
                 return False
+        if (self.x == self.y).all():
+            for c in fixed_constraints:
+                # if (c.x == c.y).all() and (self.k != c.k).any():
+                #     return False
+                if (
+                    (c.x == c.y).all()
+                    and (self.k == c.k).all()
+                    and (self.x != c.x).any()
+                ):
+                    return False
+                if (
+                    (c.x == c.y).all()
+                    and (self.x == c.x).all()
+                    and (self.k != c.k).any()
+                ):
+                    return False
         return True
 
     def dim(self):

@@ -18,6 +18,7 @@ logger.add(
 
 
 def example_no_nonces() -> AlgebraicRep:
+    # P(x,y) = H(H(x)) + H(y)
     constraints = Constraints.from_repr(
         [
             ([1, 0, 0, 0, 0], [0, 0, 1, 0, 0]),
@@ -26,7 +27,7 @@ def example_no_nonces() -> AlgebraicRep:
         ]
     )
     fixing = GF([[1, 0, 0, 0, 0], [0, 1, 0, 0, 0]])
-    output = GF([[0, 0, 0, 1, 1]])
+    output = GF([[0, 0, 0, 10, 1]])
     return AlgebraicRep(constraints, fixing, output)
 
 
@@ -43,8 +44,14 @@ def running_example() -> AlgebraicRep:
     return AlgebraicRep(constraints, fixing, output)
 
 
+def my_example() -> AlgebraicRep:
+    params = PGVParams(1, 0, 0, 0, 0, 0)
+    pgv_f = PGVComporessionFunction(params)
+    return pgv_f.construct_MD(2)
+
+
 def test_cr(program: AlgebraicRep):
-    attacks = list(program.all_maximal_collision_attacks())
+    attacks = list(program.list_collision_attacks())
     if len(attacks) == 0:
         print(f"The program\n{program}\nis Collision Resistant")
     else:
@@ -54,13 +61,9 @@ def test_cr(program: AlgebraicRep):
     # print(f"2PR attacks:\n{list(program.list_second_preimage_attacks())}")
 
 
-def test_MD_with(a, b, c, d, e, f):
-    params = PGVParams(a, b, c, d, e, f)
-    pgv_f = PGVComporessionFunction(params)
-    # if pgv_f.pgv_category()[0] != "B":
-    #     continue
+def test_MD_with(pgv_f: PGVComporessionFunction):
     print(pgv_f)
-    n = 2
+    n = 3
     H_n = pgv_f.construct_MD(n)
     logger.debug(f"H_n:\n{H_n}")
     test_cr(H_n)
@@ -68,10 +71,24 @@ def test_MD_with(a, b, c, d, e, f):
 
 def test_MD():
     for params in product([0, 1], repeat=6):
-        test_MD_with(*params)
+        params = PGVParams(*params)
+        pgv_f = PGVComporessionFunction(params)
+        test_MD_with(pgv_f)
+
+
+def test_MD_secure_cr():
+    for params in product([0, 1], repeat=6):
+        params = PGVParams(*params)
+        pgv_f = PGVComporessionFunction(params)
+        pgv_cat, _ = pgv_f.pgv_category()
+        brs_cat = pgv_f.brs_category()
+        is_cr = (pgv_cat in {"FP", "✓"}) or (brs_cat == "c" and pgv_cat == "B")
+        if is_cr:
+            test_MD_with(pgv_f)
 
 
 if __name__ == "__main__":
-    # test_cr(running_example())
-    test_MD()
+    # test_cr(example_no_nonces())
+    # test_cr(my_example())
+    test_MD_secure_cr()
     # test_MD_with(1, 0, 1, 1, 1, 0)

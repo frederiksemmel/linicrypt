@@ -1,7 +1,7 @@
 # linicrypt-solver
 
-## Setup the enviroment
-I use rye for managing the dependencies: [install rye](https://rye.astral.sh/).
+## Setup the environment
+I use [uv](https://docs.astral.sh/uv/) for managing the dependencies: .
 
 Then set up the venv with this command in the root directory of this project
 ```bash
@@ -10,7 +10,7 @@ Then set up the venv with this command in the root directory of this project
 If you didn't enable the rye shim to shadow the local python installation you
 need to activate the venv with `source ./.venv/bin/activate` in bash.
 
-## Results from the galois implementation of the CR corollary
+## Results from the Galois implementation of the CR corollary
 
 The implementation in `src/linicrypt_solver` consists mainly of these modules:
 - `field.py`: Definition of the field that is used. I am using the prime order field $F_{29}$
@@ -27,7 +27,7 @@ The implementation in `src/linicrypt_solver` consists mainly of these modules:
 The most important method on a `Constraint` is `map`.
 This enables:
 - Forcing variables to collapse
-- Checking CR for repeated nonces szenarios by solving the set of constraints in which the outputs are collapsed
+- Checking CR for repeated nonces scenarios by solving the set of constraints in which the outputs are collapsed
 - Easy construction of Merkle-Damgard construction by collapsing the input and output variables of the chained compression functions
 
 The implementation of CR and 2PR reproduces the categorization from PGV and BRS.

@@ -116,7 +116,7 @@ class PGVComporessionFunction:
                 return "X_i + H_{i-1}", 2
         raise ValueError
 
-    def pgv_category(self):
+    def pgv_category(self) -> tuple[str, int]:
         _, i_ff = self.pgv_choice_of_ff()
         _, i_k = self.pgv_choice_of_k()
         _, i_p = self.pgv_choice_of_p()
@@ -155,14 +155,14 @@ class PGVComporessionFunction:
         assert pgv_index > 0
         return pgv_category, pgv_index
 
-    def brs_category(self):
+    def brs_category(self) -> str:
         brs_categories = (
             "abcaadeafbebfdcfcacacbebeaeaebcbcbgbcdggebgbedggaagaabgafagafbgb"
         )
         _, pgv_index = self.pgv_category()
         return brs_categories[pgv_index - 1]
 
-    def construct_MD(self, n: int, basis: str = "merkle-damgard"):
+    def construct_MD(self, n: int, basis: str = "merkle-damgard") -> AlgebraicRep:
         md_construction = self.algebraic_rep(basis)
         for _ in range(2, n + 1):
             dim = md_construction.dim()

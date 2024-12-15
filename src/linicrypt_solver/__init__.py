@@ -61,3 +61,8 @@ class Constraint(ABC):
 
 
 DualVector = list[int] | FieldArray | np.ndarray
+
+
+def main():
+    # TODO impleement and add to scripts in pyproject
+    pass

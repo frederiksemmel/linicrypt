@@ -42,6 +42,30 @@ def is_finer(partition_a, partition_b) -> bool:
     )
 
 
+def join(partition_a: Partition, partition_b: Partition) -> Partition:
+    equiv_classes = []
+    all_subsets = partition_a + partition_b
+    for set_a in all_subsets:
+        union_class_a = set(set_a)
+        for set_b in all_subsets:
+            a = set(set_a)
+            b = set(set_b)
+            if len(a.intersection(b)) > 0:
+                union_class_a = union_class_a.union(b)
+        logger.info(f"Unionc class {union_class_a}")
+        equiv_classes.append(frozenset(union_class_a))
+
+    equiv_classes_set = frozenset(equiv_classes)
+    join = list(list(equiv_class) for equiv_class in equiv_classes_set)
+    return join
+
+
+def test_join():
+    a = [[3], [1, 2]]
+    b = [[1], [2, 3]]
+    assert join(a, b) == [[1, 2, 3]]
+
+
 def test_subset():
     a = [2, 3]
     b = [1, 2, 3]
