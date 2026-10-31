@@ -1,14 +1,17 @@
 # linicrypt-solver
 
-## Setup the environment
-I use [uv](https://docs.astral.sh/uv/) for managing the dependencies: .
+Python solver for Linicrypt (Carmer and Rosulek, CRYPTO 2016): decides collision resistance of
+random-oracle and ideal-cipher constructions over a finite field. Follow-up work to my MSc thesis
+[Modeling the Ideal Cipher in Linicrypt](https://github.com/frederiksemmel/linicrypt_ideal_cipher)
+(ETH Zürich, Prof. Ueli Maurer).
 
-Then set up the venv with this command in the root directory of this project
+## Setup the environment
+I use [uv](https://docs.astral.sh/uv/) for managing the dependencies.
+Set up the venv with this command in the root directory of this project:
 ```bash
-  rye sync
+uv sync
 ```
-If you didn't enable the rye shim to shadow the local python installation you
-need to activate the venv with `source ./.venv/bin/activate` in bash.
+Then run commands inside it with `uv run`, or activate it with `source .venv/bin/activate`.
 
 ## Results from the Galois implementation of the CR corollary
 
